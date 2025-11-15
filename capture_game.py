@@ -295,22 +295,27 @@ def extract_score(img_full, debug=False, iteration=None):
         print(f"  Saved debug images: debug_score_*{suffix}.png")
     
     # Build score from detected digits
-    # Handle leading zeros or missing digits
-    if all(d is None for d in detected_digits):
+    # If first digit is None, detection failed
+    if detected_digits[0] is None:
         if debug:
-            print(f"  ✗ No digits detected")
+            print(f"  ✗ First digit not detected")
         return None
     
-    # Build number (skip leading None/blanks)
+    # Build score from left to right, stop at first None
     score_str = ""
     for digit in detected_digits:
-        if digit is not None:
-            score_str += str(digit)
-        elif score_str:  # If we've started building, treat as 0
-            score_str += "0"
+        if digit is None:
+            break  # Stop at first None, ignore trailing positions
+        score_str += str(digit)
+    
+    # Convert to integer
+    if not score_str:
+        if debug:
+            print(f"  ✗ No valid score string")
+        return None
     
     try:
-        score = int(score_str) if score_str else 0
+        score = int(score_str)
         if debug:
             print(f"  ✓ Score: {score}")
         return score
