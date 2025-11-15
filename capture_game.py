@@ -6,6 +6,7 @@ from PIL import Image
 import time
 import pytesseract
 
+
 # Step 1: Screenshot function
 def capture_game_screen(monitor_region):
     """Capture a screenshot of the game area"""
@@ -168,6 +169,59 @@ def is_virus_color(img, x, y, target_color_bgr, tolerance=5):
     
     return b_match and g_match and r_match
 
+def extract_score(img_full, debug=False, iteration=None):
+    """
+    Extract score from fixed score counter region
+    Score region: screen coords (55, 772) to (90, 787)
+    In captured image: (55, 647) to (90, 662) since capture starts at y=125
+    Returns: score as integer, or None if failed
+    """
+    # Convert screen coordinates to captured image coordinates
+    score_y_start = 772 - 125  # 647
+    score_y_end = 787 - 125    # 662
+    score_x_start = 55
+    score_x_end = 90
+    
+    # Crop the score region
+    score_region = img_full[score_y_start:score_y_end, score_x_start:score_x_end]
+    
+    # Convert to grayscale
+    gray = cv2.cvtColor(score_region, cv2.COLOR_BGR2GRAY)
+    
+    # Resize larger for better OCR (4x scale)
+    scale = 4
+    height, width = gray.shape
+    resized = cv2.resize(gray, (width * scale, height * scale),
+                        interpolation=cv2.INTER_CUBIC)
+    
+    # Tesseract config for digits only
+    custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
+    
+    # OCR on grayscale
+    text = pytesseract.image_to_string(resized, config=custom_config).strip()
+    
+    if debug:
+        print(f"\n[DEBUG] Score Extraction:")
+        print(f"  Region shape: {score_region.shape}")
+        print(f"  OCR text: '{text}'")
+        
+        # Save debug images
+        suffix = f"_iter{iteration}" if iteration is not None else ""
+        cv2.imwrite(f'debug_score_region{suffix}.png', score_region)
+        cv2.imwrite(f'debug_score_resized{suffix}.png', resized)
+        print(f"  Saved debug images: debug_score_*{suffix}.png")
+    
+    # Try to parse as integer
+    try:
+        score = int(text)
+        if debug:
+            print(f"  ✓ Score: {score}")
+        return score
+    except ValueError:
+        if debug:
+            print(f"  ✗ Failed to parse score")
+        return None
+
 def detect_game_end(img_full, template_path='game-end.png'):
     """
     Detect if the game end screen is showing using template matching
@@ -289,11 +343,18 @@ def main():
         # Detect if game has ended
         game_ended = detect_game_end(img_full)
         
+        # Find and sum all numbers on screen
+        score = extract_score(img_full, debug=True, iteration=iteration)
+        
         # Get game state (with game end detection)
         game_state = get_game_state(classified, game_ended)
         
+        # Add score to game state
+        game_state['score'] = score
+        
         # Print game state
         print(f"\nGame Ended: {game_state['game_ended']}")
+        print(f"Score: {game_state['score']}")
         print(f"Self Position: {game_state['self_position']}")
         print(f"  Format: (x, y, radius)")
         
