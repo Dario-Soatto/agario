@@ -213,6 +213,10 @@ def extract_score(img_full, debug=False, iteration=None):
         best_match_score = -1
         best_digit = None
         
+        # Store scores for 2 and 7 for debugging
+        score_2 = None
+        score_7 = None
+        
         for digit, template in templates.items():
             # Resize template to match region size if needed
             if template.shape != digit_region.shape:
@@ -224,15 +228,40 @@ def extract_score(img_full, debug=False, iteration=None):
             result = cv2.matchTemplate(digit_region, template_resized, cv2.TM_CCOEFF_NORMED)
             match_score = result[0, 0]  # Single value since sizes match
             
+            # Store scores for 2 and 7
+            if digit == 2:
+                score_2 = match_score
+            elif digit == 7:
+                score_7 = match_score
+            
             if match_score > best_match_score:
                 best_match_score = match_score
                 best_digit = digit
         
-        # Check if match is good enough (threshold)
+         # Check if match is good enough (threshold)
         if best_match_score > 0.35:  # Adjust threshold as needed
-            detected_digits.append(best_digit)
-            if debug:
-                print(f"  Digit {pos_idx+1}: {best_digit} (score: {best_match_score:.3f})")
+            # Special case: If 7 won but 2 is close, prefer 2
+            if best_digit == 7 and score_2 is not None:
+                # If 2's score is within 0.2 of 7's score, choose 2 instead
+                if (best_match_score - score_2) <= 0.2:
+                    detected_digits.append(2)
+                    if debug:
+                        print(f"  Digit {pos_idx+1}: 2 (OVERRIDE - close to 7) "
+                              f"[2:{score_2:.3f} vs 7:{score_7:.3f}, diff:{best_match_score - score_2:.3f}]")
+                else:
+                    detected_digits.append(best_digit)
+                    if debug:
+                        print(f"  Digit {pos_idx+1}: {best_digit} (score: {best_match_score:.3f}) "
+                              f"[2:{score_2:.3f} vs 7:{score_7:.3f}]")
+            else:
+                detected_digits.append(best_digit)
+                if debug:
+                    # Show 2 vs 7 comparison when either is detected
+                    if best_digit in [2, 7]:
+                        print(f"  Digit {pos_idx+1}: {best_digit} (score: {best_match_score:.3f}) "
+                              f"[2:{score_2:.3f} vs 7:{score_7:.3f}]")
+                    else:
+                        print(f"  Digit {pos_idx+1}: {best_digit} (score: {best_match_score:.3f})")
         else:
             # No good match - might be empty/blank
             if debug:
