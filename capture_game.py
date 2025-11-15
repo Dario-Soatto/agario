@@ -171,49 +171,117 @@ def is_virus_color(img, x, y, target_color_bgr, tolerance=5):
 
 def extract_score(img_full, debug=False, iteration=None):
     """
-    Extract score from fixed score counter region
-    Score region: screen coords (55, 772) to (90, 787)
-    In captured image: (55, 647) to (90, 662) since capture starts at y=125
+    Extract score using template matching for each digit
+    Score has 4 digits at fixed positions
+    Y bounds: 773-788 (screen coords) -> 648-663 (captured image)
+    X bounds for 4 digits: 57-65, 65-73, 73-81, 81-89
     Returns: score as integer, or None if failed
     """
+    # Load digit templates (0-9)
+    templates = {}
+    for digit in range(10):
+        template_path = f'templates/{digit}.png'
+        template = cv2.imread(template_path, cv2.IMREAD_GRAYSCALE)
+        if template is None:
+            print(f"Error: Could not load template '{template_path}'")
+            return None
+        templates[digit] = template
+    
     # Convert screen coordinates to captured image coordinates
-    score_y_start = 772 - 125  # 647
-    score_y_end = 787 - 125    # 662
-    score_x_start = 55
-    score_x_end = 90
+    y_start = 771 - 125  # 646
+    y_end = 786 - 125    # 661
     
-    # Crop the score region
-    score_region = img_full[score_y_start:score_y_end, score_x_start:score_x_end]
+    # Define the 4 digit positions (x coordinates)
+    digit_positions = [
+        (57, 65),   # Digit 1 (thousands)
+        (65, 73),   # Digit 2 (hundreds)
+        (73, 81),   # Digit 3 (tens)
+        (81, 89)    # Digit 4 (ones)
+    ]
     
-    # Convert to grayscale
-    gray = cv2.cvtColor(score_region, cv2.COLOR_BGR2GRAY)
+    # Convert to grayscale for matching
+    gray = cv2.cvtColor(img_full, cv2.COLOR_BGR2GRAY)
     
-    # Resize larger for better OCR (4x scale)
-    scale = 4
-    height, width = gray.shape
-    resized = cv2.resize(gray, (width * scale, height * scale),
-                        interpolation=cv2.INTER_CUBIC)
+    detected_digits = []
     
-    # Tesseract config for digits only
-    custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
-    
-    # OCR on grayscale
-    text = pytesseract.image_to_string(resized, config=custom_config).strip()
+    # Match each digit position
+    for pos_idx, (x_start, x_end) in enumerate(digit_positions):
+        # Extract digit region
+        digit_region = gray[y_start:y_end, x_start:x_end]
+        
+        # Match against all digit templates
+        best_match_score = -1
+        best_digit = None
+        
+        for digit, template in templates.items():
+            # Resize template to match region size if needed
+            if template.shape != digit_region.shape:
+                template_resized = cv2.resize(template, (digit_region.shape[1], digit_region.shape[0]))
+            else:
+                template_resized = template
+            
+            # Perform template matching
+            result = cv2.matchTemplate(digit_region, template_resized, cv2.TM_CCOEFF_NORMED)
+            match_score = result[0, 0]  # Single value since sizes match
+            
+            if match_score > best_match_score:
+                best_match_score = match_score
+                best_digit = digit
+        
+        # Check if match is good enough (threshold)
+        if best_match_score > 0.35:  # Adjust threshold as needed
+            detected_digits.append(best_digit)
+            if debug:
+                print(f"  Digit {pos_idx+1}: {best_digit} (score: {best_match_score:.3f})")
+        else:
+            # No good match - might be empty/blank
+            if debug:
+                print(f"  Digit {pos_idx+1}: ? (score: {best_match_score:.3f}, below threshold)")
+            detected_digits.append(None)
     
     if debug:
-        print(f"\n[DEBUG] Score Extraction:")
-        print(f"  Region shape: {score_region.shape}")
-        print(f"  OCR text: '{text}'")
+        print(f"\n[DEBUG] Score Extraction (Template Matching):")
+        print(f"  Detected digits: {detected_digits}")
         
         # Save debug images
         suffix = f"_iter{iteration}" if iteration is not None else ""
+        
+        # Save the full score region
+        score_region = img_full[y_start:y_end, 57:89]
         cv2.imwrite(f'debug_score_region{suffix}.png', score_region)
-        cv2.imwrite(f'debug_score_resized{suffix}.png', resized)
+        
+        # Visualize matches
+        vis_img = cv2.cvtColor(gray[y_start:y_end, 57:89].copy(), cv2.COLOR_GRAY2BGR)
+        for i, (x_start, x_end) in enumerate(digit_positions):
+            # Draw box around each digit
+            x1 = x_start - 57  # Adjust to local coordinates
+            x2 = x_end - 57
+            color = (0, 255, 0) if detected_digits[i] is not None else (0, 0, 255)
+            cv2.rectangle(vis_img, (x1, 0), (x2, vis_img.shape[0]), color, 1)
+            # Add label
+            if detected_digits[i] is not None:
+                cv2.putText(vis_img, str(detected_digits[i]), (x1, 12),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+        cv2.imwrite(f'debug_score_vis{suffix}.png', vis_img)
         print(f"  Saved debug images: debug_score_*{suffix}.png")
     
-    # Try to parse as integer
+    # Build score from detected digits
+    # Handle leading zeros or missing digits
+    if all(d is None for d in detected_digits):
+        if debug:
+            print(f"  ✗ No digits detected")
+        return None
+    
+    # Build number (skip leading None/blanks)
+    score_str = ""
+    for digit in detected_digits:
+        if digit is not None:
+            score_str += str(digit)
+        elif score_str:  # If we've started building, treat as 0
+            score_str += "0"
+    
     try:
-        score = int(text)
+        score = int(score_str) if score_str else 0
         if debug:
             print(f"  ✓ Score: {score}")
         return score
