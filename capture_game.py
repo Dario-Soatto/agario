@@ -397,6 +397,87 @@ def get_game_state(classified, game_ended):
     
     return game_state
 
+def game_state_to_vector(game_state):
+    """
+    Convert game state dictionary to fixed-size numpy vector for RL
+    
+    Vector structure (24 values total):
+    - Self position: x, y, radius (3 values)
+    - Score: 1 value
+    - 3 nearest viruses: x, y, radius each (9 values)
+    - 3 nearest other players: x, y, radius each (9 values)
+    - Food count: 1 value
+    - Game ended flag: 1 value (0 or 1)
+    
+    If fewer than 3 viruses/players exist, remaining slots are filled with -1
+    """
+    vector = []
+    
+    # 1. Self position (3 values)
+    if game_state['self_position'] is not None:
+        x, y, radius = game_state['self_position']
+        vector.extend([x, y, radius])
+    else:
+        vector.extend([-1, -1, -1])  # Dead or not found
+    
+    # 2. Score (1 value)
+    score = game_state.get('score', 0)
+    if score is None:
+        score = 0
+    vector.append(score)
+    
+    # 3. Get self position for distance calculations
+    if game_state['self_position'] is not None:
+        self_x, self_y, _ = game_state['self_position']
+    else:
+        self_x, self_y = 0, 0
+    
+    # 4. 3 Nearest viruses (9 values: 3 viruses × 3 values each)
+    viruses = game_state['viruses']
+    
+    # Calculate distances and sort by closest
+    virus_distances = []
+    for v_x, v_y, v_radius in viruses:
+        distance = np.sqrt((v_x - self_x)**2 + (v_y - self_y)**2)
+        virus_distances.append((distance, v_x, v_y, v_radius))
+    
+    virus_distances.sort(key=lambda v: v[0])  # Sort by distance
+    
+    # Take 3 nearest viruses
+    for i in range(3):
+        if i < len(virus_distances):
+            _, v_x, v_y, v_radius = virus_distances[i]
+            vector.extend([v_x, v_y, v_radius])
+        else:
+            vector.extend([-1, -1, -1])  # Padding if fewer than 3
+    
+    # 5. 3 Nearest other players (9 values: 3 players × 3 values each)
+    other_players = game_state['other_players']
+    
+    # Calculate distances and sort by closest
+    player_distances = []
+    for p_x, p_y, p_radius in other_players:
+        distance = np.sqrt((p_x - self_x)**2 + (p_y - self_y)**2)
+        player_distances.append((distance, p_x, p_y, p_radius))
+    
+    player_distances.sort(key=lambda p: p[0])  # Sort by distance
+    
+    # Take 3 nearest players
+    for i in range(3):
+        if i < len(player_distances):
+            _, p_x, p_y, p_radius = player_distances[i]
+            vector.extend([p_x, p_y, p_radius])
+        else:
+            vector.extend([-1, -1, -1])  # Padding if fewer than 3
+    
+    # 6. Food count (1 value)
+    vector.append(game_state['food_count'])
+    
+    # 7. Game ended flag (1 value)
+    vector.append(1 if game_state['game_ended'] else 0)
+    
+    return np.array(vector, dtype=np.float32)
+
 # Step 4: Main loop
 def main():
     # Game window region coordinates
@@ -454,11 +535,14 @@ def main():
         # Add score to game state
         game_state['score'] = score
         
+        # Convert to fixed-size vector
+        state_vector = game_state_to_vector(game_state)
+        
         # Print game state
         print(f"\nGame Ended: {game_state['game_ended']}")
         print(f"Score: {game_state['score']}")
-        print(f"Self Position: {game_state['self_position']}")
-        print(f"  Format: (x, y, radius)")
+        print(f"State Vector Shape: {state_vector.shape}")
+        print(f"State Vector: {state_vector}")
         
         print(f"\nViruses ({len(game_state['viruses'])} detected):")
         for i, virus in enumerate(game_state['viruses']):
