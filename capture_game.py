@@ -478,6 +478,90 @@ def game_state_to_vector(game_state):
     
     return np.array(vector, dtype=np.float32)
 
+def save_game_visualization(img_game, img_full, game_state, classified, iteration):
+    """
+    Save a comprehensive visualization of the entire game state
+    Shows all detected elements with labels and colors
+    Uses full screenshot to include score area
+    """
+    # Create visualization on FULL image (includes score area)
+    vis_img = img_full.copy()
+    
+    # Color coding:
+    # White = Food
+    # Green = Self
+    # Red = Viruses
+    # Yellow = Other players
+    
+    # Note: classified blob positions are relative to img_game (game area only)
+    # They don't need adjustment since they're already in the correct coordinates
+    
+    # 1. Draw all food (white dots)
+    for food in classified['food']:
+        x, y = food['x'], food['y']
+        radius = food['radius']
+        cv2.circle(vis_img, (x, y), radius, (255, 255, 255), 1)
+    
+    # 2. Draw self (green - thick outline)
+    if classified['self']:
+        s = classified['self']
+        x, y, radius = s['x'], s['y'], s['radius']
+        cv2.circle(vis_img, (x, y), radius, (0, 255, 0), 3)
+        cv2.circle(vis_img, (x, y), 3, (0, 255, 0), -1)  # Center dot
+        cv2.putText(vis_img, f"SELF r={radius}", (x-40, y-radius-10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    
+    # 3. Draw viruses (red)
+    for virus in classified['viruses']:
+        x, y, radius = virus['x'], virus['y'], virus['radius']
+        cv2.circle(vis_img, (x, y), radius, (0, 0, 255), 2)
+        cv2.circle(vis_img, (x, y), 3, (0, 0, 255), -1)  # Center dot
+        cv2.putText(vis_img, f"VIRUS r={radius}", (x-40, y-radius-10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+    
+    # 4. Draw other players (yellow)
+    for player in classified['other_players']:
+        x, y, radius = player['x'], player['y'], player['radius']
+        cv2.circle(vis_img, (x, y), radius, (0, 255, 255), 2)
+        cv2.circle(vis_img, (x, y), 3, (0, 255, 255), -1)  # Center dot
+        cv2.putText(vis_img, f"r={radius}", (x-20, y-radius-10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+    
+    # 5. Add legend in top-left corner
+    legend_y = 30
+    cv2.putText(vis_img, "Legend:", (10, legend_y), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+    cv2.putText(vis_img, "Green = Self", (10, legend_y + 25), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    cv2.putText(vis_img, "Red = Viruses", (10, legend_y + 50), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+    cv2.putText(vis_img, "Yellow = Players", (10, legend_y + 75), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+    cv2.putText(vis_img, "White = Food", (10, legend_y + 100), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+    
+    # 6. Add game stats in top-right corner (BLACK text)
+    stats_x = vis_img.shape[1] - 200
+    stats_y = 30
+    cv2.putText(vis_img, f"Score: {game_state.get('score', 'N/A')}", 
+               (stats_x, stats_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+    cv2.putText(vis_img, f"Food: {game_state['food_count']}", 
+               (stats_x, stats_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+    cv2.putText(vis_img, f"Viruses: {len(game_state['viruses'])}", 
+               (stats_x, stats_y + 55), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+    cv2.putText(vis_img, f"Players: {len(game_state['other_players'])}", 
+               (stats_x, stats_y + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+    
+    if game_state['game_ended']:
+        # Big red "GAME OVER" if ended
+        cv2.putText(vis_img, "GAME OVER", (vis_img.shape[1]//2 - 150, vis_img.shape[0]//2),
+                   cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 4)
+    
+    # 7. Save the visualization
+    cv2.imwrite(f'debug_full_game_iter{iteration}.png', vis_img)
+    
+    print(f"  Saved full game visualization: debug_full_game_iter{iteration}.png")
+
 # Step 4: Main loop
 def main():
     # Game window region coordinates
@@ -526,8 +610,8 @@ def main():
         # Detect if game has ended
         game_ended = detect_game_end(img_full)
         
-        # Find and sum all numbers on screen
-        score = extract_score(img_full, debug=True, iteration=iteration)
+        # Extract score (turn off individual debug)
+        score = extract_score(img_full, debug=False, iteration=iteration)
         
         # Get game state (with game end detection)
         game_state = get_game_state(classified, game_ended)
@@ -537,6 +621,9 @@ def main():
         
         # Convert to fixed-size vector
         state_vector = game_state_to_vector(game_state)
+        
+        # Save comprehensive visualization
+        save_game_visualization(img_game, img_full, game_state, classified, iteration)
         
         # Print game state
         print(f"\nGame Ended: {game_state['game_ended']}")
