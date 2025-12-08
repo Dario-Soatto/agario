@@ -1,0 +1,4 @@
+timestamp,episode,step,action,action_name,q_eat,q_hunt,q_flee,q_tovirus,q_fromvirus,q_chosen,self_radius,food_count,player_count,nearest_food_dx,nearest_food_dy,nearest_player_dx,nearest_player_dy,nearest_player_r,has_virus,steps_alive,time_alive_sec,score
+2025-12-08T10:06:47.609688,1,0,3,TO_VIRUS,-103.2920,-99.3745,-95.6196,-89.1218,-94.3344,-89.1218,77,7,3,-1.0,151.0,-1.0,202.0,66.0,0,0,0.52,0
+2025-12-08T10:06:49.951922,1,1,3,TO_VIRUS,-103.2920,-99.3745,-95.6196,-89.1218,-94.3344,-89.1218,77,7,3,-1.0,150.0,-1.0,202.0,66.0,0,1,2.59,0
+2025-12-08T10:06:52.287589,1,2,3,TO_VIRUS,-103.2773,-99.3604,-95.6055,-89.1084,-94.3203,-89.1084,77,7,3,-1.0,151.0,-1.0,202.0,66.0,0,2,4.97,0
