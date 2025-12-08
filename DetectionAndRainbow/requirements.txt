@@ -1,0 +1,18 @@
+# Rainbow DQN for Agar.io - Dependencies
+
+# Deep Learning
+torch>=2.0.0
+numpy>=1.21.0
+
+# Screen Capture & Computer Vision
+mss>=9.0.0
+opencv-python>=4.8.0
+Pillow>=10.0.0
+
+# Input Control
+pyautogui>=0.9.54
+pynput>=1.7.6
+
+# OCR (only for menu detection, not used during gameplay)
+easyocr>=1.7.0
+
