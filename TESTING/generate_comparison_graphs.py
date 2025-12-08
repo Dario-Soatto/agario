@@ -262,54 +262,67 @@ def plot_action_distributions(action_dists, output_dir):
     """
     Figure 4: Action distribution comparison
     Shows what actions each approach prefers
+    Each pie chart only shows actions for that specific approach
     """
     approaches = list(action_dists.keys())
     n_approaches = len(approaches)
     
-    fig, axes = plt.subplots(1, n_approaches, figsize=(4*n_approaches, 4))
+    fig, axes = plt.subplots(1, n_approaches, figsize=(4.5*n_approaches, 5))
     if n_approaches == 1:
         axes = [axes]
     
-    # Get all unique actions
-    all_actions = set()
-    for dist in action_dists.values():
-        all_actions.update(dist.index)
-    all_actions = sorted(all_actions)
-    
-    # Action colors (semantic)
+    # Action colors - consistent colors for same actions
     action_colors = {
+        # 5 Semantic actions (Dueling DQN, Random)
         'EAT_FOOD': '#4CAF50',      # Green
-        'HUNT_PREY': '#F44336',     # Red
+        'HUNT_PREY': '#E91E63',     # Pink/Red
         'FLEE_THREAT': '#2196F3',   # Blue
         'TO_VIRUS': '#9C27B0',      # Purple
         'FROM_VIRUS': '#FF9800',    # Orange
-        'UP': '#4CAF50',
-        'DOWN': '#F44336',
-        'LEFT': '#2196F3',
-        'RIGHT': '#FF9800',
+        # 4 Cardinal directions (Rainbow DQN)
+        'UP': '#4CAF50',            # Green
+        'DOWN': '#E91E63',          # Pink/Red
+        'LEFT': '#2196F3',          # Blue
+        'RIGHT': '#FF9800',         # Orange
     }
     
     for ax, approach in zip(axes, approaches):
         dist = action_dists[approach]
         
-        # Normalize to percentages
-        values = [dist.get(a, 0) for a in all_actions if a in dist.index]
-        labels = [a for a in all_actions if a in dist.index]
+        # Get only THIS approach's actions (sorted by count, descending)
+        actions_this = dist.index.tolist()
+        values = dist.values.tolist()
+        
+        # Sort by value for better visualization
+        sorted_pairs = sorted(zip(actions_this, values), key=lambda x: -x[1])
+        labels = [p[0] for p in sorted_pairs]
+        values = [p[1] for p in sorted_pairs]
         colors = [action_colors.get(a, '#888888') for a in labels]
         
-        wedges, texts, autotexts = ax.pie(values, labels=None, autopct='%1.0f%%',
-                                           colors=colors, startangle=90,
-                                           pctdistance=0.75)
+        # Create pie chart
+        wedges, texts, autotexts = ax.pie(
+            values, 
+            labels=None,  # We'll add legend instead
+            autopct='%1.0f%%',
+            colors=colors, 
+            startangle=90,
+            pctdistance=0.7,
+            wedgeprops={'edgecolor': 'white', 'linewidth': 1}
+        )
         
-        ax.set_title(f'{approach}', fontweight='bold', fontsize=11)
+        # Style the percentage text
+        for autotext in autotexts:
+            autotext.set_fontsize(9)
+            autotext.set_fontweight('bold')
         
-        # Legend for first plot only
-        if ax == axes[0]:
-            ax.legend(wedges, labels, loc='center left', bbox_to_anchor=(-0.3, 0.5),
-                     fontsize=8)
+        ax.set_title(f'{approach}', fontweight='bold', fontsize=12, pad=10)
+        
+        # Add legend below each pie chart
+        ax.legend(wedges, labels, loc='upper center', bbox_to_anchor=(0.5, -0.05),
+                 fontsize=9, ncol=2 if len(labels) > 3 else len(labels))
     
-    fig.suptitle('Action Selection Distribution by Approach', fontweight='bold', y=1.02)
-    plt.tight_layout()
+    fig.suptitle('Action Selection Distribution by Approach', fontweight='bold', fontsize=14, y=0.98)
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
     
     path = output_dir / 'fig4_action_distributions.png'
     plt.savefig(path)
