@@ -127,12 +127,14 @@ def plot_survival_comparison(stats, output_dir):
     ax.set_title('(a) Survival Duration (Steps)')
     ax.set_xticks(x)
     ax.set_xticklabels(approaches, rotation=15, ha='right')
-    ax.set_ylim(0, max(means) * 1.4)
+    # Set y-limit to accommodate error bars + labels (use max of mean+std, not just mean)
+    max_height = max(m + s for m, s in zip(means, stds))
+    ax.set_ylim(0, max_height * 1.35)
     
     # Add value labels on bars
     for bar, mean, std in zip(bars, means, stds):
         ax.annotate(f'{mean:.1f}±{std:.1f}',
-                   xy=(bar.get_x() + bar.get_width()/2, bar.get_height() + std),
+                   xy=(bar.get_x() + bar.get_width()/2, bar.get_height() + std + 1),
                    ha='center', va='bottom', fontsize=9)
     
     # Time alive
@@ -146,11 +148,13 @@ def plot_survival_comparison(stats, output_dir):
     ax.set_title('(b) Survival Duration (Time)')
     ax.set_xticks(x)
     ax.set_xticklabels(approaches, rotation=15, ha='right')
-    ax.set_ylim(0, max(means) * 1.4)
+    # Set y-limit to accommodate error bars + labels
+    max_height = max(m + s for m, s in zip(means, stds))
+    ax.set_ylim(0, max_height * 1.35)
     
     for bar, mean, std in zip(bars, means, stds):
         ax.annotate(f'{mean:.1f}±{std:.1f}s',
-                   xy=(bar.get_x() + bar.get_width()/2, bar.get_height() + std),
+                   xy=(bar.get_x() + bar.get_width()/2, bar.get_height() + std + 1),
                    ha='center', va='bottom', fontsize=9)
     
     fig.suptitle('Survival Performance Comparison: DQN Approaches vs Random Baseline', 
@@ -337,6 +341,8 @@ def plot_combined_summary(stats, output_dir):
     ax1.set_title('(a) Mean Survival (Steps)', fontsize=11)
     ax1.set_xticks(x)
     ax1.set_xticklabels([a.replace(' ', '\n') for a in approaches], fontsize=9)
+    max_height = max(m + s for m, s in zip(means, stds))
+    ax1.set_ylim(0, max_height * 1.25)
     
     # (b) Time bar chart
     ax2 = fig.add_subplot(gs[0, 1])
@@ -347,6 +353,8 @@ def plot_combined_summary(stats, output_dir):
     ax2.set_title('(b) Mean Survival (Time)', fontsize=11)
     ax2.set_xticks(x)
     ax2.set_xticklabels([a.replace(' ', '\n') for a in approaches], fontsize=9)
+    max_height = max(m + s for m, s in zip(means, stds))
+    ax2.set_ylim(0, max_height * 1.25)
     
     # (c) Improvement over random
     ax3 = fig.add_subplot(gs[0, 2])
