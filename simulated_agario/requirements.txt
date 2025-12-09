@@ -1,0 +1,13 @@
+# Simulated Agar.io - DQN Training with Flask Visualization
+# Install with: pip install -r requirements.txt
+
+# Core ML
+torch>=1.9.0
+numpy>=1.19.0
+
+# Web visualization
+flask>=2.0.0
+
+# Optional - for standalone training
+tqdm>=4.60.0
+
